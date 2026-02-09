@@ -27,8 +27,20 @@ bash <(curl -s https://raw.githubusercontent.com/theuargb/magento2-copilot-demo/
 
 ---
 
+## 🤖 Automated Deployment with GitHub Actions
+
+**NEW!** Deploy automatically with GitHub Actions:
+
+1. **Initial Installation** - One-click setup from GitHub Actions
+2. **Continuous Deployment** - Auto-deploy on every push to main branch
+
+📖 **[GitHub Actions Setup Guide](GITHUB_ACTIONS.md)**
+
+---
+
 ## 📚 Documentation
 
+- **[GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)** - Automated deployment with GitHub Actions ⭐ NEW!
 - **[INSTALL.md](INSTALL.md)** - Quick start guide for your Hetzner server
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Detailed deployment instructions
 - **[README.md](README.md)** - You are here

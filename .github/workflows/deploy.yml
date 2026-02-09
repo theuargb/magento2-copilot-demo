@@ -1,0 +1,176 @@
+name: Deploy Magento Updates
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - 'docs/**'
+  
+  workflow_dispatch:
+    inputs:
+      server_ip:
+        description: 'Server IP Address'
+        required: true
+        default: '89.167.21.190'
+      skip_static_deploy:
+        description: 'Skip static content deployment'
+        required: false
+        default: 'false'
+      maintenance_mode:
+        description: 'Enable maintenance mode during deployment'
+        required: false
+        default: 'true'
+
+jobs:
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts
+      
+      - name: Test SSH connection
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh -o StrictHostKeyChecking=no root@$SERVER_IP "echo 'SSH connection successful'"
+      
+      - name: Create backup before deployment
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            if [ -f backup.sh ]; then
+              echo "Creating backup before deployment..."
+              ./backup.sh || echo "Backup failed, continuing with deployment..."
+            fi
+          EOF
+      
+      - name: Enable maintenance mode
+        if: github.event.inputs.maintenance_mode != 'false'
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Enabling maintenance mode..."
+            docker-compose exec -T web bin/magento maintenance:enable || true
+          EOF
+      
+      - name: Sync code to server
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          echo "Syncing code to server..."
+          rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
+            --exclude='var' --exclude='generated' --exclude='pub/static' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ root@$SERVER_IP:/opt/magento2/
+      
+      - name: Update Composer dependencies
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Updating Composer dependencies..."
+            docker-compose exec -T web composer install --no-interaction --prefer-dist --optimize-autoloader
+          EOF
+      
+      - name: Run Magento upgrade
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Running Magento upgrade..."
+            docker-compose exec -T web bin/magento setup:upgrade
+          EOF
+      
+      - name: Compile DI
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Compiling dependency injection..."
+            docker-compose exec -T web bin/magento setup:di:compile
+          EOF
+      
+      - name: Deploy static content
+        if: github.event.inputs.skip_static_deploy != 'true'
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Deploying static content..."
+            docker-compose exec -T web bin/magento setup:static-content:deploy -f en_US
+          EOF
+      
+      - name: Set proper permissions
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Setting file permissions..."
+            docker-compose exec -T web chmod -R 777 var/ generated/ pub/static/ pub/media/
+          EOF
+      
+      - name: Flush cache
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Flushing cache..."
+            docker-compose exec -T web bin/magento cache:flush
+          EOF
+      
+      - name: Reindex
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Running reindex..."
+            docker-compose exec -T web bin/magento indexer:reindex
+          EOF
+      
+      - name: Disable maintenance mode
+        if: always() && github.event.inputs.maintenance_mode != 'false'
+        run: |
+          SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
+          ssh root@$SERVER_IP << 'EOF'
+            cd /opt/magento2
+            echo "Disabling maintenance mode..."
+            docker-compose exec -T web bin/magento maintenance:disable || true
+          EOF
+      
+      - name: Display deployment status
+        if: success()
+        run: |
+          echo "=========================================="
+          echo "Deployment Successful!"
+          echo "=========================================="
+          echo ""
+          echo "Deployed commit: ${{ github.sha }}"
+          echo "Deployed by: ${{ github.actor }}"
+          echo ""
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "=========================================="
+          echo "Deployment Failed!"
+          echo "=========================================="
+          echo ""
+          echo "Check the logs above for details."
+          echo "Maintenance mode may still be enabled."
+          echo ""

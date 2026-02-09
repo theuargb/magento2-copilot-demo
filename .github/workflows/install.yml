@@ -1,0 +1,204 @@
+name: Initial Magento Installation
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_ip:
+        description: 'Server IP Address'
+        required: true
+        default: '89.167.21.190'
+      base_url:
+        description: 'Base URL for Magento'
+        required: true
+        default: 'http://89.167.21.190'
+
+jobs:
+  install:
+    name: Install Magento 2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ inputs.server_ip }} >> ~/.ssh/known_hosts
+      
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ inputs.server_ip }} "echo 'SSH connection successful'"
+      
+      - name: Copy repository to server
+        run: |
+          echo "Creating deployment directory on server..."
+          ssh root@${{ inputs.server_ip }} "mkdir -p /opt/magento2"
+          
+          echo "Copying files to server..."
+          rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ root@${{ inputs.server_ip }}:/opt/magento2/
+      
+      - name: Install Docker and Docker Compose
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            set -e
+            
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+              rm get-docker.sh
+              systemctl enable docker
+              systemctl start docker
+            else
+              echo "Docker already installed"
+            fi
+            
+            # Install Docker Compose if not present
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installing Docker Compose..."
+              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              chmod +x /usr/local/bin/docker-compose
+            else
+              echo "Docker Compose already installed"
+            fi
+            
+            docker --version
+            docker-compose --version
+          EOF
+      
+      - name: Start Docker containers
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Starting Docker containers..."
+            docker-compose up -d
+            
+            echo "Waiting for services to be ready..."
+            sleep 30
+            
+            # Wait for MariaDB
+            echo "Waiting for MariaDB..."
+            until docker-compose exec -T db mysqladmin ping -h"localhost" --silent; do
+              echo "Waiting for database connection..."
+              sleep 5
+            done
+            
+            # Wait for Elasticsearch
+            echo "Waiting for Elasticsearch..."
+            for i in {1..30}; do
+              if curl -s http://localhost:9200 >/dev/null; then
+                echo "Elasticsearch is ready"
+                break
+              fi
+              echo "Waiting for Elasticsearch... ($i/30)"
+              sleep 5
+            done
+          EOF
+      
+      - name: Install Composer dependencies
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Installing Composer dependencies..."
+            docker-compose exec -T web composer install --no-interaction --prefer-dist --optimize-autoloader
+          EOF
+      
+      - name: Install Magento
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Installing Magento..."
+            docker-compose exec -T web bin/magento setup:install \
+              --base-url="${{ inputs.base_url }}/" \
+              --db-host=db \
+              --db-name="${{ secrets.DB_NAME || 'magento2' }}" \
+              --db-user="${{ secrets.DB_USER || 'magento2' }}" \
+              --db-password="${{ secrets.DB_PASSWORD || 'magento2' }}" \
+              --admin-firstname="${{ secrets.ADMIN_FIRSTNAME || 'Admin' }}" \
+              --admin-lastname="${{ secrets.ADMIN_LASTNAME || 'User' }}" \
+              --admin-email="${{ secrets.ADMIN_EMAIL || 'admin@magento.local' }}" \
+              --admin-user="${{ secrets.ADMIN_USER || 'admin' }}" \
+              --admin-password="${{ secrets.ADMIN_PASSWORD || 'Admin@123456' }}" \
+              --language=en_US \
+              --currency=USD \
+              --timezone=America/Chicago \
+              --use-rewrites=1 \
+              --search-engine=elasticsearch8 \
+              --elasticsearch-host=elasticsearch \
+              --elasticsearch-port=9200 \
+              --elasticsearch-index-prefix=magento2 \
+              --elasticsearch-enable-auth=0 \
+              --elasticsearch-timeout=15 \
+              --cleanup-database
+          EOF
+      
+      - name: Configure Redis caching
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Configuring Redis caching..."
+            docker-compose exec -T web bin/magento setup:config:set \
+              --cache-backend=redis \
+              --cache-backend-redis-server=redis \
+              --cache-backend-redis-db=0
+            
+            docker-compose exec -T web bin/magento setup:config:set \
+              --page-cache=redis \
+              --page-cache-redis-server=redis \
+              --page-cache-redis-db=1
+            
+            docker-compose exec -T web bin/magento setup:config:set \
+              --session-save=redis \
+              --session-save-redis-host=redis \
+              --session-save-redis-db=2
+          EOF
+      
+      - name: Deploy static content and compile
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Deploying static content..."
+            docker-compose exec -T web bin/magento setup:static-content:deploy -f
+            
+            echo "Compiling DI..."
+            docker-compose exec -T web bin/magento setup:di:compile
+            
+            echo "Setting file permissions..."
+            docker-compose exec -T web chmod -R 777 var/ generated/ pub/static/ pub/media/
+          EOF
+      
+      - name: Enable production mode
+        run: |
+          ssh root@${{ inputs.server_ip }} << 'EOF'
+            cd /opt/magento2
+            echo "Enabling production mode..."
+            docker-compose exec -T web bin/magento deploy:mode:set production --skip-compilation
+            
+            echo "Flushing cache..."
+            docker-compose exec -T web bin/magento cache:flush
+            
+            echo "Running reindex..."
+            docker-compose exec -T web bin/magento indexer:reindex
+          EOF
+      
+      - name: Display installation info
+        run: |
+          echo "=========================================="
+          echo "Installation Complete!"
+          echo "=========================================="
+          echo ""
+          echo "Store URL: ${{ inputs.base_url }}"
+          echo "Admin URL: ${{ inputs.base_url }}/admin"
+          echo ""
+          echo "Please check the Actions output for admin credentials."
+          echo "Remember to change the admin password after first login!"
+          echo ""
