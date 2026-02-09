@@ -1,6 +1,51 @@
-# Magento 2 Community Edition Demo
+# Magento 2 Community Edition - Deployment Ready 🚀
 
-This repository contains a fresh installation of **Magento 2.4.8-p3 Community Edition**.
+This repository contains **Magento 2.4.8-p3 Community Edition** ready for deployment.
+
+---
+
+## 🎯 Deploy to Your Hetzner Server (89.167.21.190)
+
+### One-Line Installation
+```bash
+ssh root@89.167.21.190
+bash <(curl -s https://raw.githubusercontent.com/theuargb/magento2-copilot-demo/copilot/install-magento-shop/quick-start.sh)
+```
+
+**That's it!** Wait 10-15 minutes and your shop will be ready.
+
+📖 **[Click here for detailed instructions](INSTALL.md)**
+
+---
+
+## ✅ After Installation
+
+- **Your Store**: http://89.167.21.190
+- **Admin Panel**: http://89.167.21.190/admin
+  - Username: `admin`
+  - Password: `Admin@123456` (⚠️ change immediately!)
+
+---
+
+## 🤖 Automated Deployment with GitHub Actions
+
+**NEW!** Deploy automatically with GitHub Actions:
+
+1. **Initial Installation** - One-click setup from GitHub Actions
+2. **Continuous Deployment** - Auto-deploy on every push to main branch
+
+📖 **[GitHub Actions Setup Guide](GITHUB_ACTIONS.md)**
+
+---
+
+## 📚 Documentation
+
+- **[GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)** - Automated deployment with GitHub Actions ⭐ NEW!
+- **[INSTALL.md](INSTALL.md)** - Quick start guide for your Hetzner server
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Detailed deployment instructions
+- **[README.md](README.md)** - You are here
+
+---
 
 ## Installation Details
 

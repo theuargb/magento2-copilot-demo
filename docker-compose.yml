@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  web:
+    image: webdevops/php-apache:8.3
+    container_name: magento2-web
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - .:/app:cached
+      - ./docker/php/php.ini:/opt/docker/etc/php/php.ini
+    environment:
+      - WEB_DOCUMENT_ROOT=/app/pub
+      - PHP_DATE_TIMEZONE=UTC
+      - PHP_DISPLAY_ERRORS=1
+      - PHP_MEMORY_LIMIT=2G
+      - PHP_MAX_EXECUTION_TIME=18000
+      - PHP_POST_MAX_SIZE=256M
+      - PHP_UPLOAD_MAX_FILESIZE=256M
+    depends_on:
+      - db
+      - elasticsearch
+    networks:
+      - magento
+
+  db:
+    image: mariadb:10.6
+    container_name: magento2-db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=magento2
+      - MYSQL_DATABASE=magento2
+      - MYSQL_USER=magento2
+      - MYSQL_PASSWORD=magento2
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - magento
+    command: --max_allowed_packet=256M
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: magento2-elasticsearch
+    restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - magento
+
+  redis:
+    image: redis:7-alpine
+    container_name: magento2-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - magento
+
+volumes:
+  db-data:
+  elasticsearch-data:
+
+networks:
+  magento:
+    driver: bridge
