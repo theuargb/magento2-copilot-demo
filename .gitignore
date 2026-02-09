@@ -1,0 +1,55 @@
+# Magento 2 .gitignore
+# https://github.com/magento/magento2/blob/2.4-develop/.gitignore
+
+# Ignore vendor directory
+/vendor/
+
+# Ignore generated files
+/generated/
+
+# Ignore pub/static (except .htaccess)
+/pub/static/*
+!/pub/static/.htaccess
+
+# Ignore pub/media (except .htaccess)
+/pub/media/*
+!/pub/media/.htaccess
+!/pub/media/customer/.htaccess
+!/pub/media/downloadable/.htaccess
+!/pub/media/import/.htaccess
+!/pub/media/theme_customization/.htaccess
+
+# Ignore var directory (except .htaccess)
+/var/*
+!/var/.htaccess
+
+# Ignore app/etc/env.php (contains sensitive data)
+/app/etc/env.php
+
+# Ignore composer.lock (optional, but good practice for projects)
+# Uncomment if you want to commit the lock file
+# /composer.lock
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node modules (if using frontend build tools)
+node_modules/
+
+# Auth file (contains sensitive credentials)
+/auth.json
+
+# Backup files
+*.bak
+*.orig
