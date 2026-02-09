@@ -46,7 +46,7 @@ jobs:
           
           echo "Copying files to server..."
           rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
-            -e "sshpass -p '$SSH_PASSWORD' ssh -o StrictHostKeyChecking=no" \
+            -e "sshpass -p \"$SSH_PASSWORD\" ssh -o StrictHostKeyChecking=no" \
             ./ root@${{ inputs.server_ip }}:/opt/magento2/
       
       - name: Install Docker and Docker Compose

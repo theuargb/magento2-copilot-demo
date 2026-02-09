@@ -84,7 +84,7 @@ jobs:
           echo "Syncing code to server..."
           rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
             --exclude='var' --exclude='generated' --exclude='pub/static' \
-            -e "sshpass -p '$SSH_PASSWORD' ssh -o StrictHostKeyChecking=no" \
+            -e "sshpass -p \"$SSH_PASSWORD\" ssh -o StrictHostKeyChecking=no" \
             ./ root@$SERVER_IP:/opt/magento2/
       
       - name: Update Composer dependencies

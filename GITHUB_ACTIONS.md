@@ -5,6 +5,19 @@ This repository includes two GitHub Actions workflows for automated deployment o
 1. **Initial Installation** (`install.yml`) - For first-time setup
 2. **Continuous Deployment** (`deploy.yml`) - For subsequent updates
 
+## ⚠️ SECURITY WARNING
+
+**This configuration is set up for DEMO/DEVELOPMENT purposes only!**
+
+The workflows include a hardcoded default password for quick demonstration. This is **NOT** secure and should **NEVER** be used in production environments.
+
+**For Production Use:**
+1. **NEVER** commit passwords or credentials to your repository
+2. Set `SSH_PASSWORD` as a GitHub Secret (Settings → Secrets and variables → Actions)
+3. Consider using SSH key-based authentication instead of passwords
+4. Rotate credentials immediately if they are exposed
+5. Use proper security practices including firewalls, fail2ban, and strong passwords
+
 ## Prerequisites
 
 ### 1. SSH Access Setup
