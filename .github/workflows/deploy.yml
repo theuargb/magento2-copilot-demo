@@ -34,10 +34,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Install sshpass for password authentication
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
       
       - name: Add server to known hosts
         run: |
@@ -45,14 +45,18 @@ jobs:
           ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts
       
       - name: Test SSH connection
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh -o StrictHostKeyChecking=no root@$SERVER_IP "echo 'SSH connection successful'"
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no root@$SERVER_IP "echo 'SSH connection successful'"
       
       - name: Create backup before deployment
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             if [ -f backup.sh ]; then
               echo "Creating backup before deployment..."
@@ -62,45 +66,55 @@ jobs:
       
       - name: Enable maintenance mode
         if: github.event.inputs.maintenance_mode != 'false'
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Enabling maintenance mode..."
             docker-compose exec -T web bin/magento maintenance:enable || true
           EOF
       
       - name: Sync code to server
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
           echo "Syncing code to server..."
           rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
             --exclude='var' --exclude='generated' --exclude='pub/static' \
-            -e "ssh -o StrictHostKeyChecking=no" \
+            -e "sshpass -p '$SSH_PASSWORD' ssh -o StrictHostKeyChecking=no" \
             ./ root@$SERVER_IP:/opt/magento2/
       
       - name: Update Composer dependencies
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Updating Composer dependencies..."
             docker-compose exec -T web composer install --no-interaction --prefer-dist --optimize-autoloader
           EOF
       
       - name: Run Magento upgrade
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Running Magento upgrade..."
             docker-compose exec -T web bin/magento setup:upgrade
           EOF
       
       - name: Compile DI
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Compiling dependency injection..."
             docker-compose exec -T web bin/magento setup:di:compile
@@ -108,36 +122,44 @@ jobs:
       
       - name: Deploy static content
         if: github.event.inputs.skip_static_deploy != 'true'
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Deploying static content..."
             docker-compose exec -T web bin/magento setup:static-content:deploy -f en_US
           EOF
       
       - name: Set proper permissions
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Setting file permissions..."
             docker-compose exec -T web chmod -R 777 var/ generated/ pub/static/ pub/media/
           EOF
       
       - name: Flush cache
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Flushing cache..."
             docker-compose exec -T web bin/magento cache:flush
           EOF
       
       - name: Reindex
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Running reindex..."
             docker-compose exec -T web bin/magento indexer:reindex
@@ -145,9 +167,11 @@ jobs:
       
       - name: Disable maintenance mode
         if: always() && github.event.inputs.maintenance_mode != 'false'
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           SERVER_IP="${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }}"
-          ssh root@$SERVER_IP << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@$SERVER_IP << 'EOF'
             cd /opt/magento2
             echo "Disabling maintenance mode..."
             docker-compose exec -T web bin/magento maintenance:disable || true

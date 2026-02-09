@@ -21,10 +21,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Install sshpass for password authentication
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
       
       - name: Add server to known hosts
         run: |
@@ -32,22 +32,28 @@ jobs:
           ssh-keyscan -H ${{ inputs.server_ip }} >> ~/.ssh/known_hosts
       
       - name: Test SSH connection
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ inputs.server_ip }} "echo 'SSH connection successful'"
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no root@${{ inputs.server_ip }} "echo 'SSH connection successful'"
       
       - name: Copy repository to server
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
           echo "Creating deployment directory on server..."
-          ssh root@${{ inputs.server_ip }} "mkdir -p /opt/magento2"
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} "mkdir -p /opt/magento2"
           
           echo "Copying files to server..."
           rsync -avz --exclude='.git' --exclude='vendor' --exclude='node_modules' \
-            -e "ssh -o StrictHostKeyChecking=no" \
+            -e "sshpass -p '$SSH_PASSWORD' ssh -o StrictHostKeyChecking=no" \
             ./ root@${{ inputs.server_ip }}:/opt/magento2/
       
       - name: Install Docker and Docker Compose
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             set -e
             
             # Install Docker if not present
@@ -76,8 +82,10 @@ jobs:
           EOF
       
       - name: Start Docker containers
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Starting Docker containers..."
             docker-compose up -d
@@ -105,16 +113,20 @@ jobs:
           EOF
       
       - name: Install Composer dependencies
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Installing Composer dependencies..."
             docker-compose exec -T web composer install --no-interaction --prefer-dist --optimize-autoloader
           EOF
       
       - name: Install Magento
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Installing Magento..."
             docker-compose exec -T web bin/magento setup:install \
@@ -142,8 +154,10 @@ jobs:
           EOF
       
       - name: Configure Redis caching
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Configuring Redis caching..."
             docker-compose exec -T web bin/magento setup:config:set \
@@ -163,8 +177,10 @@ jobs:
           EOF
       
       - name: Deploy static content and compile
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Deploying static content..."
             docker-compose exec -T web bin/magento setup:static-content:deploy -f
@@ -177,8 +193,10 @@ jobs:
           EOF
       
       - name: Enable production mode
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ inputs.server_ip }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ inputs.server_ip }} << 'EOF'
             cd /opt/magento2
             echo "Enabling production mode..."
             docker-compose exec -T web bin/magento deploy:mode:set production --skip-compilation
