@@ -50,6 +50,9 @@ node_modules/
 # Auth file (contains sensitive credentials)
 /auth.json
 
+# Environment file (contains sensitive configuration)
+/.env
+
 # Backup files
 *.bak
 *.orig

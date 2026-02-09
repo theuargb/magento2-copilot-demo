@@ -2,6 +2,20 @@
 
 This repository contains a fresh installation of **Magento 2.4.8-p3 Community Edition**.
 
+## 🚀 Quick Deployment to Hetzner Server (89.167.21.190)
+
+**One-line deployment:**
+```bash
+ssh root@89.167.21.190
+bash <(curl -s https://raw.githubusercontent.com/theuargb/magento2-copilot-demo/main/quick-start.sh)
+```
+
+Or follow the detailed instructions in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+After deployment, your shop will be available at:
+- **Store**: http://89.167.21.190
+- **Admin**: http://89.167.21.190/admin (user: `admin`, pass: `Admin@123456`)
+
 ## Installation Details
 
 - **Version**: 2.4.8-p3 (Latest Community Edition as of February 2026)
