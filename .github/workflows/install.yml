@@ -29,7 +29,10 @@ jobs:
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ inputs.server_ip }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ inputs.server_ip }} >> ~/.ssh/known_hosts 2>/dev/null || {
+            echo "Warning: ssh-keyscan failed to add server to known_hosts"
+            echo "Connection will proceed with StrictHostKeyChecking=no"
+          }
       
       - name: Test SSH connection
         env:
