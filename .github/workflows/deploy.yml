@@ -42,7 +42,10 @@ jobs:
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts || true
+          if ! ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts 2>&1; then
+            echo "Warning: ssh-keyscan failed to add server to known_hosts"
+            echo "Connection will proceed with StrictHostKeyChecking=no"
+          fi
       
       - name: Test SSH connection
         env:
