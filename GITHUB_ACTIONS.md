@@ -5,18 +5,43 @@ This repository includes two GitHub Actions workflows for automated deployment o
 1. **Initial Installation** (`install.yml`) - For first-time setup
 2. **Continuous Deployment** (`deploy.yml`) - For subsequent updates
 
+## ⚠️ SECURITY WARNING
+
+**This configuration is set up for DEMO/DEVELOPMENT purposes only!**
+
+The workflows include a hardcoded default password for quick demonstration. This is **NOT** secure and should **NEVER** be used in production environments.
+
+**For Production Use:**
+1. **NEVER** commit passwords or credentials to your repository
+2. Set `SSH_PASSWORD` as a GitHub Secret (Settings → Secrets and variables → Actions)
+3. Consider using SSH key-based authentication instead of passwords
+4. Rotate credentials immediately if they are exposed
+5. Use proper security practices including firewalls, fail2ban, and strong passwords
+
 ## Prerequisites
 
 ### 1. SSH Access Setup
 
-You need to set up SSH key authentication for GitHub Actions to access your server.
+The workflows support password-based SSH authentication for quick setup and demo purposes.
 
-#### Generate SSH Key (on your local machine):
+**For Production:** It's recommended to use SSH key-based authentication instead.
+
+#### Option A: Password Authentication (Current Setup - Demo/Development)
+
+The workflows are configured to use password authentication by default:
+- Default server: `89.167.21.190`
+- Default password: `rkJTMk3KX4Hk`
+
+For better security, you can override the password using GitHub Secrets (see below).
+
+#### Option B: SSH Key Authentication (Recommended for Production)
+
+Generate SSH Key (on your local machine):
 ```bash
 ssh-keygen -t ed25519 -C "github-actions@magento-deploy" -f ~/.ssh/github_actions_magento
 ```
 
-#### Add Public Key to Server:
+Add Public Key to Server:
 ```bash
 ssh-copy-id -i ~/.ssh/github_actions_magento.pub root@89.167.21.190
 ```
@@ -30,17 +55,19 @@ echo "YOUR_PUBLIC_KEY_CONTENT" >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 ```
 
+Then modify the workflows to use SSH keys instead of password authentication.
+
 ### 2. Configure GitHub Secrets
 
 Go to your repository on GitHub: `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
 
 Add the following secrets:
 
-#### Required Secrets:
+#### Optional Secrets (for overriding defaults):
 
-| Secret Name | Description | Example Value |
+| Secret Name | Description | Default Value |
 |-------------|-------------|---------------|
-| `SSH_PRIVATE_KEY` | Private SSH key for server access | Contents of `~/.ssh/github_actions_magento` |
+| `SSH_PASSWORD` | SSH password for server access | `rkJTMk3KX4Hk` |
 | `SERVER_IP` | Server IP address (optional, can use workflow input) | `89.167.21.190` |
 
 #### Optional Secrets (if you want to override defaults):
@@ -238,14 +265,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
       
       - name: Custom deployment steps
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD || 'rkJTMk3KX4Hk' }}
         run: |
-          ssh root@${{ secrets.SERVER_IP }} << 'EOF'
+          sshpass -p "$SSH_PASSWORD" ssh root@${{ secrets.SERVER_IP }} << 'EOF'
             cd /opt/magento2
             # Your custom commands here
           EOF
