@@ -42,7 +42,7 @@ jobs:
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ github.event.inputs.server_ip || secrets.SERVER_IP || '89.167.21.190' }} >> ~/.ssh/known_hosts || true
       
       - name: Test SSH connection
         env:
